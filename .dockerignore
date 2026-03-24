@@ -1,0 +1,16 @@
+# --- Python Environments ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# --- Heavy Data & Research ---
+runs/
+*.mp4
+*.ipynb
+research/
+
+# --- Git & OS Files ---
+.git/
+.gitignore
+.DS_Store
