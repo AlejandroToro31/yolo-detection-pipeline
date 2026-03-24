@@ -1,0 +1,37 @@
+# --- Python & Environments ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env
+
+# --- Model Artifacts & Weights ---
+models/*.pth
+models/*.pt
+*.pt
+*.engine
+*.onnx
+
+# --- YOLO & Computer Vision Data ---
+runs/
+datasets/
+data/
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.avi
+
+# --- FastAPI & Logging ---
+*.log
+
+# --- Jupyter & Research ---
+.ipynb_checkpoints/
+
+# --- OS Generated Files ---
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
