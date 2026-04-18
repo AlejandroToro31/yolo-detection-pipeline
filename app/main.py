@@ -1,5 +1,7 @@
 import os
+import time
 import logging
+import asyncio
 import cv2
 import numpy as np
 from contextlib import asynccontextmanager
@@ -20,6 +22,7 @@ logger = logging.getLogger("YOLO-API")
 MODEL_PATH = os.getenv("MODEL_PATH", "models/best.pt")
 CONF_THRESHOLD = float(os.getenv("CONF_THRESHOLD", "0.40"))
 IOU_THRESHOLD = float(os.getenv("IOU_THRESHOLD", "0.50"))
+MAX_PAYLOAD_SIZE = 10 * 1024 * 1024  # 10 MB limit
 ml_state = {} 
 
 # --- SERVER LIFESPAN MANAGEMENT ---
@@ -28,7 +31,6 @@ async def lifespan(app: FastAPI):
     logger.info("Booting YOLOv8 Real-Time Detection API...")
     
     try:
-        # Load the compiled Ultralytics artifact
         model = YOLO(MODEL_PATH)
         ml_state["model"] = model
         logger.info(f"YOLOv8 Engine online. Confidence Threshold: {CONF_THRESHOLD} | IoU: {IOU_THRESHOLD}")
@@ -59,6 +61,7 @@ class Detection(BaseModel):
 class DetectionResponse(BaseModel):
     filename: str
     total_detections: int
+    process_time_ms: float
     detections: List[Detection]
 
 # --- THE ENDPOINT ---
@@ -67,8 +70,15 @@ async def detect_objects(file: UploadFile = File(...)):
     if not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Invalid payload. Image required.")
 
+    # 1. Payload Size Validation
+    file.file.seek(0, os.SEEK_END)
+    file_size = file.file.tell()
+    file.file.seek(0)
+    if file_size > MAX_PAYLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Payload Exceeds 10MB limit.")
+
     try:
-        # 1. Direct Memory Decode (Zero Disk I/O)
+        # 2. Direct Memory Decode
         image_bytes = await file.read()
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -76,15 +86,22 @@ async def detect_objects(file: UploadFile = File(...)):
 
         model = ml_state["model"]
         
-        # 2. Forward Pass Inference
-        results = model.predict(
+        # 3. Asynchronous Inference (Thread Offloading & Telemetry)
+        start_time = time.perf_counter()
+        
+        results = await asyncio.to_thread(
+            model.predict,
             source=img,
             conf=CONF_THRESHOLD,
             iou=IOU_THRESHOLD,
             verbose=False
-        )[0]
+        )
+        results = results[0]
         
-        # 3. Payload Extraction
+        end_time = time.perf_counter()
+        latency_ms = round((end_time - start_time) * 1000, 2)
+        
+        # 4. Payload Extraction
         detections = []
         for box in results.boxes:
             detections.append(
@@ -96,11 +113,15 @@ async def detect_objects(file: UploadFile = File(...)):
                 )
             )
 
-        logger.info(f"Analyzed '{file.filename}': Found {len(detections)} objects.")
+        logger.info(f"Analyzed '{file.filename}': {len(detections)} objects in {latency_ms}ms.")
+
+        # Explicitly release large array from memory
+        del image_bytes, nparr, img
 
         return DetectionResponse(
             filename=file.filename,
             total_detections=len(detections),
+            process_time_ms=latency_ms,
             detections=detections
         )
 
