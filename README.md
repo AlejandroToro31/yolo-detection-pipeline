@@ -41,7 +41,7 @@ docker run -p 8000:8000 -e CONF_THRESHOLD=0.40 -e IOU_THRESHOLD=0.50 yolo-api:la
 ### 3. Execute Inference & Telemetry
 Navigate to http://127.0.0.1:8000/docs to access the interactive Swagger UI. Upload a raw image to the POST /detect/ endpoint.
 
-Expected JSON Telemetry Response:
+## Expected JSON Telemetry Response:
 
 ```JSON
 {
