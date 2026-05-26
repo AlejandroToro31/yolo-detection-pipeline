@@ -1,15 +1,33 @@
-# MLOps Optimization: Force CPU-only PyTorch to shrink Docker image size
+# ==============================================================
+# PPE Detection API — Python Dependencies
+# ==============================================================
+# All versions are pinned for deterministic builds.
+# Unpinned dependencies risk silent breakage when upstream
+# packages release breaking changes.
+#
+# Generate updated pins from a working environment:
+#   pip freeze > requirements.txt
+# ==============================================================
+
+# ── PyTorch CPU Index
+# CPU-only PyTorch wheel (~200MB) vs default CUDA wheel (~2.5GB).
+# --extra-index-url tells pip to check this index for +cpu variants.
+# Required because PyPI only hosts the full CUDA build by default.
+# Result: Docker image stays lightweight and cold-start latency is minimal.
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-# Core API
+# ── API Framework
 fastapi==0.104.1
-uvicorn==0.24.0
-python-multipart==0.0.6
+uvicorn[standard]==0.24.0      # [standard] installs uvloop + httptools (C-based async backends)
+python-multipart==0.0.6        # Required by FastAPI for UploadFile multipart parsing — commonly forgotten
 pydantic==2.5.2
 
-# YOLOv8 Engine & Headless Vision
-ultralytics==8.0.222
+# ── ML Engine (CPU-only)
 torch==2.1.1+cpu
 torchvision==0.16.1+cpu
-opencv-python-headless==4.8.1.78
+ultralytics==8.0.222
+
+# ── Computer Vision
+opencv-python-headless==4.8.1.78   # Headless: no GUI dependencies — required for Docker Linux containers
+Pillow==10.1.0                      # Image I/O backend used internally by Ultralytics
 numpy==1.26.2
