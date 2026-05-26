@@ -1,16 +1,65 @@
-# --- Python Environments ---
+# ==============================================================
+# .dockerignore — PPE Detection API
+# ==============================================================
+# Excludes files from the Docker build context.
+# Smaller build context = faster builds + smaller images.
+# NEVER include secrets, environments, or research artifacts.
+# ==============================================================
+
+# ── Python Environments (NEVER include — pip install handles deps inside container)
 __pycache__/
 *.py[cod]
+*.pyo
 .venv/
 venv/
+env/
 
-# --- Heavy Data & Research ---
-runs/
-*.mp4
-*.ipynb
+# ── Secrets (CRITICAL — never bake credentials into images)
+.env
+*.env
+.env.*
+
+# ── Research & Training Artifacts
+runs/           # YOLO training output — can be GBs of checkpoints
 research/
+training/       # Training scripts not needed in inference container
+*.ipynb         # Jupyter notebooks — development only
 
-# --- Git & OS Files ---
+# ── Heavy Media Files
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# ── Logs
+*.log
+logs/
+
+# ── Test & Coverage Files
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Documentation (not needed inside container)
+*.md
+docs/
+
+# ── Conda Environment Files
+environment.yml
+conda-lock.yml
+*.conda
+
+# ── Development Requirements (only production requirements.txt is needed)
+requirements-dev.txt
+
+# ── IDE Artifacts
+.idea/
+.vscode/
+*.code-workspace
+
+# ── Git & OS Files
 .git/
 .gitignore
 .DS_Store
+Thumbs.db
