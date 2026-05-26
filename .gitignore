@@ -1,37 +1,73 @@
-# --- Python & Environments ---
+# ==============================================================
+# .gitignore — PPE Detection API
+# ==============================================================
+
+# ── Python & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyo
+
+# ── Virtual Environments (never track — recreated via requirements.txt)
 .venv/
 venv/
 env/
-.env
 
-# --- Model Artifacts & Weights ---
-models/*.pth
-models/*.pt
+# ── Secrets (CRITICAL — never commit credentials)
+.env
+*.env
+.env.*
+
+# ── Model Artifacts & Weights
+# Weights are large binary files — tracked via external storage (Google Drive)
+# Cloners: download best.pt and place in models/ — see README.md
+models/*
+!models/.gitkeep      # preserves the models/ directory structure in the repo
 *.pt
+*.pth
 *.engine
 *.onnx
 
-# --- YOLO & Computer Vision Data ---
+# ── YOLO Training Output (can be GBs of checkpoints and visualizations)
 runs/
+
+# ── Dataset Directories (managed via Roboflow — not committed to repo)
 datasets/
 data/
-*.jpg
-*.jpeg
-*.png
+
+# ── Media Files (specific directories only — not global wildcard)
+# Global *.jpg / *.png would incorrectly exclude README assets and diagrams
+test_images/
+sample_frames/
 *.mp4
 *.avi
+*.mov
+*.mkv
 
-# --- FastAPI & Logging ---
+# ── Logs
 *.log
+logs/
 
-# --- Jupyter & Research ---
+# ── Jupyter & Research
 .ipynb_checkpoints/
 
-# --- OS Generated Files ---
+# ── Test & Coverage Artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# ── IDE Artifacts
+.idea/
+.vscode/
+*.code-workspace
+
+# ── Build & Distribution
+dist/
+build/
+*.egg-info/
+
+# ── OS Generated Files
 .DS_Store
-.DS_Store?
 ._*
 Thumbs.db
