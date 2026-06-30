@@ -23,6 +23,7 @@ env/
 # Cloners: download best.pt and place in models/ — see README.md
 models/*
 !models/.gitkeep      # preserves the models/ directory structure in the repo
+!models/best.pt
 *.pt
 *.pth
 *.engine
