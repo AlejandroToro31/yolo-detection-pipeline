@@ -92,7 +92,7 @@ USER api_user
 # ── Port Declaration
 # Documents that the container listens on port 8000.
 # Does not actually publish the port — use -p 8000:8000 at docker run.
-EXPOSE 8000
+EXPOSE 7860
 
 # ── Health Monitoring
 # Docker automatically monitors container health using this instruction.
@@ -115,4 +115,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 
 # ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
