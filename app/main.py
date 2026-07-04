@@ -58,7 +58,9 @@ logger = logging.getLogger("YOLO-API")
 # 2. GLOBAL CONFIGURATION
 # ════════════════════════════════════════════════════════
 
-MODEL_PATH: str       = os.getenv("MODEL_PATH", "models/best.pt")
+#MODEL_PATH: str       = os.getenv("MODEL_PATH", "models/best.pt")
+# ATTETION: As im uploading this file to HuggingFace, repo is going to be flat structure
+MODEL_PATH: str       = os.getenv("MODEL_PATH", "best.pt")
 CONF_THRESHOLD: float = float(os.getenv("CONF_THRESHOLD", "0.40"))
 IOU_THRESHOLD: float  = float(os.getenv("IOU_THRESHOLD", "0.50"))
 MAX_PAYLOAD_BYTES: int = 10 * 1024 * 1024  # 10 MB

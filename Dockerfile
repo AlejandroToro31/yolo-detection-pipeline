@@ -77,8 +77,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ── Application Code
 # --chown sets file ownership in a single COPY layer.
 # Avoids a separate RUN chown command which would add an extra layer.
-COPY --chown=api_user app/ app/
-COPY --chown=api_user models/ models/
+#COPY --chown=api_user app/ app/
+#COPY --chown=api_user models/ models/
+
+# ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
+COPY --chown=api_user main.py .
+COPY --chown=api_user best.pt .
 
 # ── Drop Privileges
 # Switch to non-root user for all subsequent operations including CMD.
@@ -108,4 +112,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #                  Note: each worker loads its own model instance into memory
 #                  Calculate: model_size_MB × workers ≤ available RAM
 # --workers 1    : Choose 1 for HuggingFace Space upload
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+
+# ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
