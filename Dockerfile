@@ -36,10 +36,11 @@ ENV PYTHONUNBUFFERED=1
 # ── Application Configuration
 # These are system defaults — override at runtime via docker run -e
 # ENV hierarchy: docker run -e (highest) > Dockerfile ENV > os.getenv fallback (lowest)
-#ENV MODEL_PATH=models/best.pt
+ENV MODEL_PATH=models/best.pt
 
 # ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
-ENV MODEL_PATH=best.pt
+#ENV MODEL_PATH=best.pt
+
 ENV CONF_THRESHOLD=0.40
 ENV IOU_THRESHOLD=0.50
 
@@ -80,12 +81,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ── Application Code
 # --chown sets file ownership in a single COPY layer.
 # Avoids a separate RUN chown command which would add an extra layer.
-#COPY --chown=api_user app/ app/
-#COPY --chown=api_user models/ models/
+COPY --chown=api_user app/ app/
+COPY --chown=api_user models/ models/
 
 # ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
-COPY --chown=api_user main.py .
-COPY --chown=api_user best.pt .
+#COPY --chown=api_user main.py .
+#COPY --chown=api_user best.pt .
 
 # ── Drop Privileges
 # Switch to non-root user for all subsequent operations including CMD.
@@ -95,7 +96,8 @@ USER api_user
 # ── Port Declaration
 # Documents that the container listens on port 8000.
 # Does not actually publish the port — use -p 8000:8000 at docker run.
-EXPOSE 7860
+EXPOSE 8000
+#EXPOSE 7860 HuggingFace port 
 
 # ── Health Monitoring
 # Docker automatically monitors container health using this instruction.
@@ -115,7 +117,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #                  Note: each worker loads its own model instance into memory
 #                  Calculate: model_size_MB × workers ≤ available RAM
 # --workers 1    : Choose 1 for HuggingFace Space upload
-#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
 
 # ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
+#CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
