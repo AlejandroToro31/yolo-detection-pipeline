@@ -1,7 +1,7 @@
 ---
 title: PPE Safety Detection API
 emoji: 🦺
-colorFrom: orange
+colorFrom: indigo
 colorTo: red
 sdk: docker
 pinned: false
