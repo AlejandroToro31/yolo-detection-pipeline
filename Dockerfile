@@ -36,7 +36,10 @@ ENV PYTHONUNBUFFERED=1
 # ── Application Configuration
 # These are system defaults — override at runtime via docker run -e
 # ENV hierarchy: docker run -e (highest) > Dockerfile ENV > os.getenv fallback (lowest)
-ENV MODEL_PATH=models/best.pt
+#ENV MODEL_PATH=models/best.pt
+
+# ATTENTION: As im uploading this file to HuggingFace, repo is going to be flat structure
+ENV MODEL_PATH=best.pt
 ENV CONF_THRESHOLD=0.40
 ENV IOU_THRESHOLD=0.50
 

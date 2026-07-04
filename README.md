@@ -18,6 +18,8 @@ A production-deployed object detection microservice for automated workplace safe
 
 Compliant with EU workplace safety standards (SUVA / EU PPE Directive 2016/425).
 
+🔗 **Live Demo:** [https://hunter1a11-realtime-safety-detection-api.hf.space/docs](https://hunter1a11-realtime-safety-detection-api.hf.space/docs) — try real-time inference directly in your browser via the interactive Swagger UI.
+
 ---
 
 ## System Architecture
@@ -128,29 +130,47 @@ curl http://127.0.0.1:8000/ready
 
 ---
 
-## Example Response
+## Example Response — Real Deployment Output
+
+Captured live from the deployed API, testing a real multi-person construction site photo:
 
 ```json
 {
-  "filename": "worker_cam_04.jpg",
-  "total_detections": 2,
-  "process_time_ms": 31.4,
+  "filename": "construction_site_workers.jpg",
+  "total_detections": 13,
+  "process_time_ms": 115.14,
   "detections": [
     {
       "class_id": 3,
       "class_name": "helmet",
-      "confidence": 0.8381,
-      "bbox": [103.06, 228.40, 359.05, 392.52]
+      "confidence": 0.8564,
+      "bbox": [99.34, 223.99, 357.46, 387.22]
+    },
+    {
+      "class_id": 3,
+      "class_name": "helmet",
+      "confidence": 0.8089,
+      "bbox": [0, 309.07, 126.66, 402.81]
     },
     {
       "class_id": 8,
       "class_name": "no-vest",
-      "confidence": 0.7612,
-      "bbox": [357.15, 524.19, 500.53, 801.02]
+      "confidence": 0.7013,
+      "bbox": [87.1, 485.79, 347.33, 1078.19]
+    },
+    {
+      "class_id": 6,
+      "class_name": "no-goggles",
+      "confidence": 0.456,
+      "bbox": [705.22, 459.98, 832.3, 509.5]
     }
   ]
 }
 ```
+
+*(Response truncated to 4 of 13 total detections for readability — full output includes 7 helmets, 5 no-vest, and 1 no-goggles detection across the scene.)*
+
+**Real-world performance:** 115.14ms end-to-end latency on CPU (HuggingFace Spaces free tier, shared vCPU) for a crowded 13-person scene — validating the CPU deployment strategy described above even under non-trivial multi-object load.
 
 `bbox` format: `[xmin, ymin, xmax, ymax]` in pixel coordinates.
 
@@ -209,3 +229,13 @@ All variables can be overridden at runtime via `docker run -e VAR=value` without
 **Non-root execution:** The container runs as `api_user` — a non-root system account. Principle of least privilege.
 
 **Health monitoring:** Docker's native `HEALTHCHECK` polls `/health` every 30 seconds with a 60-second startup grace period for model loading.
+
+---
+
+## Live Deployment Notes
+
+This API is deployed live on [Hugging Face Spaces](https://huggingface.co/spaces) (Docker SDK, free tier — 16GB RAM, 2 vCPUs). Unlike typical PaaS free tiers (Render, Railway) which cap RAM at 512MB — insufficient for PyTorch + Ultralytics — Hugging Face Spaces is purpose-built for ML workloads and handles this stack natively.
+
+Two deployment-specific adjustments from the standard Docker setup above:
+- **Port:** Hugging Face Spaces expects the container to listen on port `7860`, not `8000`
+- **Single worker:** `--workers 1` in the CMD instruction, since the free tier is a shared environment
