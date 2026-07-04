@@ -1,3 +1,12 @@
+---
+title: PPE Safety Detection API
+emoji: 🦺
+colorFrom: orange
+colorTo: red
+sdk: docker
+pinned: false
+---
+
 # YOLOv8 Real-Time PPE Detection API
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
