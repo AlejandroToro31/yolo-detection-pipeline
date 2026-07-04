@@ -107,4 +107,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 #                  Rule of thumb: (2 × CPU_cores) + 1
 #                  Note: each worker loads its own model instance into memory
 #                  Calculate: model_size_MB × workers ≤ available RAM
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# --workers 1    : Choose 1 for HuggingFace Space upload
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
