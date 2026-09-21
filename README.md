@@ -7,7 +7,7 @@ sdk: docker
 pinned: false
 ---
 
-# YOLOv8 Real-Time PPE Detection API
+# YOLOv8 PPE Detection API
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.1-orange)
@@ -18,7 +18,9 @@ A production-deployed object detection microservice for automated workplace safe
 
 Compliant with EU workplace safety standards (SUVA / EU PPE Directive 2016/425).
 
-🔗 **Live Demo:** [https://hunter1a11-realtime-safety-detection-api.hf.space/docs](https://hunter1a11-realtime-safety-detection-api.hf.space/docs) — try real-time inference directly in your browser via the interactive Swagger UI.
+🔗 **Live Demo:** [https://hunter1a11-realtime-safety-detection.hf.space/docs](https://hunter1a11-realtime-safety-detection.hf.space/docs) — try inference directly in your browser via the interactive Swagger UI.
+
+> **Note on "real-time":** the underlying YOLOv8n model is architecturally suited for real-time inference (single-stage, ~100+ FPS on GPU benchmarks). The current deployment is a single-image HTTP API — see [Roadmap](#roadmap) for what a continuous video-stream deployment would require.
 
 ---
 
@@ -35,7 +37,7 @@ Compliant with EU workplace safety standards (SUVA / EU PPE Directive 2016/425).
 | **Inference Device** | CPU | Optimized for cost-efficient cloud deployment |
 
 **Why CPU deployment:**
-GPU inference saves ~20ms per request but network latency alone is 50-100ms. For static image requests via HTTP, CPU is the correct engineering choice — 10× cheaper, instant cold starts, deployable anywhere without NVIDIA driver dependencies. GPU is reserved for real-time video stream processing at 30+ FPS.
+GPU inference saves ~20ms per request but network latency alone is 50-100ms. For static image requests via HTTP, CPU is the correct engineering choice — 10× cheaper, instant cold starts, deployable anywhere without NVIDIA driver dependencies. GPU becomes worthwhile specifically for continuous real-time video stream processing at 30+ FPS, where compute is repeated back-to-back with no network round-trip between frames — see Roadmap below.
 
 ---
 
@@ -69,6 +71,8 @@ ppe-detection-api/
 │   └── best.pt                  # Model artifact (download separately — see below)
 ├── training/
 │   └── ppe_vision_system.py     # YOLOv8 training pipeline (Roboflow + Ultralytics)
+├── assets/
+│   └── ppe_result.mp4           # Demo video — Swagger UI inference walkthrough
 ├── Dockerfile                   # Production container definition
 ├── requirements.txt             # Pinned Python dependencies
 └── README.md
@@ -137,40 +141,40 @@ Captured live from the deployed API, testing a real multi-person construction si
 ```json
 {
   "filename": "construction_site_workers.jpg",
-  "total_detections": 13,
-  "process_time_ms": 115.14,
+  "total_detections": 4,
+  "process_time_ms": 137.64,
   "detections": [
     {
       "class_id": 3,
       "class_name": "helmet",
-      "confidence": 0.8564,
-      "bbox": [99.34, 223.99, 357.46, 387.22]
+      "confidence": 0.7113,
+      "bbox": [1034.04, 449.12, 1113.21, 508.91]
+    },
+    {
+      "class_id": 9,
+      "class_name": "vest",
+      "confidence": 0.7073,
+      "bbox": [1045.73, 533.35, 1168.94, 719.48]
     },
     {
       "class_id": 3,
       "class_name": "helmet",
-      "confidence": 0.8089,
-      "bbox": [0, 309.07, 126.66, 402.81]
+      "confidence": 0.6935,
+      "bbox": [817.54, 423.32, 904.45, 493.49]
     },
     {
       "class_id": 8,
       "class_name": "no-vest",
-      "confidence": 0.7013,
-      "bbox": [87.1, 485.79, 347.33, 1078.19]
-    },
-    {
-      "class_id": 6,
-      "class_name": "no-goggles",
-      "confidence": 0.456,
-      "bbox": [705.22, 459.98, 832.3, 509.5]
+      "confidence": 0.5201,
+      "bbox": [801.55, 512.16, 932.71, 711.87]
     }
   ]
 }
 ```
 
-*(Response truncated to 4 of 13 total detections for readability — full output includes 7 helmets, 5 no-vest, and 1 no-goggles detection across the scene.)*
+**What this result shows:** two workers correctly detected wearing helmets; one worker correctly identified as wearing a compliant safety vest; a second worker in the same frame correctly flagged as **not** wearing one. The model distinguishes compliance on a per-person basis within a single crowded scene, not just a single aggregate judgment.
 
-**Real-world performance:** 115.14ms end-to-end latency on CPU (HuggingFace Spaces free tier, shared vCPU) for a crowded 13-person scene — validating the CPU deployment strategy described above even under non-trivial multi-object load.
+**Real-world performance:** 137.64ms end-to-end latency on CPU (Hugging Face Spaces free tier, shared vCPU).
 
 `bbox` format: `[xmin, ymin, xmax, ymax]` in pixel coordinates.
 
@@ -239,3 +243,14 @@ This API is deployed live on [Hugging Face Spaces](https://huggingface.co/spaces
 Two deployment-specific adjustments from the standard Docker setup above:
 - **Port:** Hugging Face Spaces expects the container to listen on port `7860`, not `8000`
 - **Single worker:** `--workers 1` in the CMD instruction, since the free tier is a shared environment
+
+---
+
+## Roadmap
+
+**Current state:** single-image HTTP inference API. The trained model and inference logic transfer completely unchanged to a video pipeline — this is deliberately the hard part, and it's already done.
+
+**What a continuous real-time video deployment would add:**
+- **Frame ingestion loop** — `cv2.VideoCapture` or an RTSP stream, replacing request/response with continuous polling
+- **Object tracking** (ByteTrack) — maintains identity across frames, robust to brief occlusion
+- **ONNX → TensorRT → INT8 export** — strips Python runtime overhead, hardware-tuned kernels, ~4× smaller model with minimal accuracy loss — the standard path for edge deployment on hardware like NVIDIA Jetson

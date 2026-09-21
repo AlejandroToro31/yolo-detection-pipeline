@@ -1,7 +1,7 @@
 """
 PPE Detection API — YOLOv8 FastAPI Microservice
 ================================================
-Real-time Personal Protective Equipment detection endpoint.
+Personal Protective Equipment detection endpoint.
 Accepts image uploads via HTTP POST and returns structured
 bounding box predictions as JSON.
 
