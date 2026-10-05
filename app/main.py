@@ -82,14 +82,14 @@ async def lifespan(app: FastAPI):
 
     STARTUP:
         Loads YOLOv8 model into memory exactly once when the server boots.
-        Runs warmup inference to compile CUDA kernels before first real request.
+        Runs warmup inference so first-call overhead is paid at boot, not by a user.
         Stores model in ml_state dict — shared across all request handlers.
 
     SHUTDOWN:
         Clears ml_state and releases memory cleanly.
 
     Why singleton pattern:
-        Loading a 100MB+ model on every request would add seconds of latency.
+        Loading the model from disk on every request would add avoidable latency.
         The singleton ensures one load at boot, then millisecond inference forever.
     """
     logger.info("Booting PPE Detection API...")
@@ -110,8 +110,9 @@ async def lifespan(app: FastAPI):
         ) from e
 
     # ── Warmup inference
-    # Compiles CUDA kernels on first pass. Without warmup, the first real
-    # inference call incurs a 3-5x latency spike from kernel compilation.
+    # The first predict() call carries one-off initialization overhead (and
+    # CUDA kernel compilation when running on GPU). Paying it here keeps it
+    # out of the first user's latency.
     logger.info("Running warmup inference...")
     dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
     await asyncio.to_thread(model.predict, source=dummy_frame, verbose=False)
@@ -132,8 +133,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="PPE Detection API",
     description=(
-        "Real-time YOLOv8 microservice for Personal Protective Equipment "
-        "detection on factory and construction site camera feeds."
+        "YOLOv8n microservice for Personal Protective Equipment (PPE) "
+        "detection on construction and factory site images. Accepts "
+        "single-image uploads and returns bounding boxes as JSON."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -242,8 +244,10 @@ async def detect_objects(file: UploadFile = File(...)) -> DetectionResponse:
         1. MIME type validation       → reject non-image content types
         2. Payload size validation    → reject files > 10MB
         3. In-memory image decoding   → zero disk I/O via cv2.imdecode
-        4. BGR → RGB conversion       → OpenCV reads BGR, YOLO expects RGB
+        4. Content validation         → imdecode returns None on bad data
         5. Thread-offloaded inference → asyncio.to_thread (non-blocking)
+           (the BGR array from OpenCV is passed as-is: Ultralytics expects
+           BGR for numpy input and converts internally)
         6. Structured response        → Pydantic-validated JSON payload
 
     Args:
@@ -299,7 +303,7 @@ async def detect_objects(file: UploadFile = File(...)) -> DetectionResponse:
         nparr: np.ndarray = np.frombuffer(image_bytes, np.uint8)
         img: Optional[np.ndarray] = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # ── Step 4: Content validation + BGR → RGB conversion
+        # ── Step 4: Content validation
         # img is None if content_type was spoofed or file is corrupted
         if img is None:
             raise HTTPException(
@@ -310,9 +314,10 @@ async def detect_objects(file: UploadFile = File(...)) -> DetectionResponse:
                 )
             )
 
-        # OpenCV reads BGR — YOLO expects RGB
-        # Missing this conversion produces silently wrong predictions
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        # NOTE: do NOT convert to RGB here. Ultralytics treats numpy input as
+        # BGR (the cv2.imread / cv2.imdecode convention) and handles the
+        # channel order internally. Converting first would feed it swapped
+        # channels. (PIL images are the RGB case, not numpy arrays.)
 
         # ── Step 5: Thread-offloaded inference
         # asyncio.to_thread offloads CPU/GPU-bound inference to a thread pool,
@@ -367,7 +372,7 @@ async def detect_objects(file: UploadFile = File(...)) -> DetectionResponse:
 
     finally:
         # Explicit memory release — prevents tensor accumulation in long-running
-        # servers processing high-volume camera feeds
+        # servers handling many requests
         try:
             del image_bytes, nparr, img
         except NameError:
