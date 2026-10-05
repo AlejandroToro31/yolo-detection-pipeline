@@ -20,7 +20,7 @@ Compliant with EU workplace safety standards (SUVA / EU PPE Directive 2016/425).
 
 🔗 **Live Demo:** [https://hunter1a11-realtime-safety-detection.hf.space/docs](https://hunter1a11-realtime-safety-detection.hf.space/docs) — try inference directly in your browser via the interactive Swagger UI.
 
-> **Note on "real-time":** the underlying YOLOv8n model is architecturally suited for real-time inference (single-stage, ~100+ FPS on GPU benchmarks). The current deployment is a single-image HTTP API — see [Roadmap](#roadmap) for what a continuous video-stream deployment would require.
+> **Note on "real-time":** the underlying YOLOv8n model is architecturally suited for real-time inference (single-stage, ~100+ FPS on GPU benchmarks). The current deployment is a single-image HTTP API.
 
 ---
 
@@ -136,45 +136,27 @@ curl http://127.0.0.1:8000/ready
 
 ## Example Response — Real Deployment Output
 
-Captured live from the deployed API, testing a real multi-person construction site photo:
+Captured live from the deployed API on a real construction-site photo with three workers:
 
 ```json
 {
-  "filename": "construction_site_workers.jpg",
-  "total_detections": 4,
-  "process_time_ms": 137.64,
+  "filename": "kO4HhmY4nP5ulWvr8Ypu2qAPNA.jpg",
+  "total_detections": 6,
+  "process_time_ms": 104.17,
   "detections": [
-    {
-      "class_id": 3,
-      "class_name": "helmet",
-      "confidence": 0.7113,
-      "bbox": [1034.04, 449.12, 1113.21, 508.91]
-    },
-    {
-      "class_id": 9,
-      "class_name": "vest",
-      "confidence": 0.7073,
-      "bbox": [1045.73, 533.35, 1168.94, 719.48]
-    },
-    {
-      "class_id": 3,
-      "class_name": "helmet",
-      "confidence": 0.6935,
-      "bbox": [817.54, 423.32, 904.45, 493.49]
-    },
-    {
-      "class_id": 8,
-      "class_name": "no-vest",
-      "confidence": 0.5201,
-      "bbox": [801.55, 512.16, 932.71, 711.87]
-    }
+    { "class_id": 9, "class_name": "vest",   "confidence": 0.8395, "bbox": [1036.45, 535.96, 1171.97, 718.72] },
+    { "class_id": 9, "class_name": "vest",   "confidence": 0.83,   "bbox": [796.13, 509.14, 930.01, 709.14] },
+    { "class_id": 9, "class_name": "vest",   "confidence": 0.8226, "bbox": [627.76, 570.64, 724.72, 773.58] },
+    { "class_id": 3, "class_name": "helmet", "confidence": 0.763,  "bbox": [1035.41, 450.19, 1111.06, 505.07] },
+    { "class_id": 3, "class_name": "helmet", "confidence": 0.7582, "bbox": [818.96, 424.48, 901.46, 488.17] },
+    { "class_id": 3, "class_name": "helmet", "confidence": 0.6952, "bbox": [664.63, 489.98, 735.93, 552.34] }
   ]
 }
 ```
 
-**What this result shows:** two workers correctly detected wearing helmets; one worker correctly identified as wearing a compliant safety vest; a second worker in the same frame correctly flagged as **not** wearing one. The model distinguishes compliance on a per-person basis within a single crowded scene, not just a single aggregate judgment.
+**What this result shows:** all three workers in the photo wear a helmet and a high-visibility vest, and the API returns exactly that — three helmets, three vests, no violation flagged. This is one test image, not a benchmark.
 
-**Real-world performance:** 137.64ms end-to-end latency on CPU (Hugging Face Spaces free tier, shared vCPU).
+**Latency:** 104.17ms for this request on CPU (Hugging Face Spaces free tier, shared vCPU). Latency varies between runs on the shared tier — measurements so far have ranged from roughly 104ms to 138ms — so treat it as an approximate figure.
 
 `bbox` format: `[xmin, ymin, xmax, ymax]` in pixel coordinates.
 
@@ -254,3 +236,9 @@ Two deployment-specific adjustments from the standard Docker setup above:
 - **Frame ingestion loop** — `cv2.VideoCapture` or an RTSP stream, replacing request/response with continuous polling
 - **Object tracking** (ByteTrack) — maintains identity across frames, robust to brief occlusion
 - **ONNX → TensorRT → INT8 export** — strips Python runtime overhead, hardware-tuned kernels, ~4× smaller model with minimal accuracy loss — the standard path for edge deployment on hardware like NVIDIA Jetson
+
+---
+
+## Changelog
+
+**v1.0.1 — colour-channel fix.** The API used to convert decoded images from BGR to RGB before calling `model.predict()`. Ultralytics treats numpy input as BGR, so the model was receiving swapped channels. It showed up as a visibly wrong result: on the test photo above, a worker wearing a vest was flagged `no-vest`. After removing the conversion, the same photo gives 6 correct detections: the false `no-vest` is gone, the left-hand worker's helmet and vest (previously missed) are detected, and confidences rose on the others (e.g. the right-hand worker's vest from 0.71 to 0.84). Single-image comparison, not a benchmark.
