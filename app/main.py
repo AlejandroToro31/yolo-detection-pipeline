@@ -58,10 +58,10 @@ logger = logging.getLogger("YOLO-API")
 # 2. GLOBAL CONFIGURATION
 # ════════════════════════════════════════════════════════
 
+# Default matches the repo layout. Other deployments override it through the
+# MODEL_PATH environment variable (the Hugging Face Space Dockerfile sets
+# MODEL_PATH=best.pt), so this file is identical in both places.
 MODEL_PATH: str       = os.getenv("MODEL_PATH", "models/best.pt")
-
-# ATTETION: As im uploading this file to HuggingFace, repo is going to be flat structure
-#MODEL_PATH: str       = os.getenv("MODEL_PATH", "best.pt")
 
 CONF_THRESHOLD: float = float(os.getenv("CONF_THRESHOLD", "0.40"))
 IOU_THRESHOLD: float  = float(os.getenv("IOU_THRESHOLD", "0.50"))

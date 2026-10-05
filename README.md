@@ -14,13 +14,13 @@ pinned: false
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.104-green)
 ![Docker](https://img.shields.io/badge/Docker-ready-blue)
 
-A production-deployed object detection microservice for automated workplace safety monitoring. Detects the presence and absence of Personal Protective Equipment (PPE) — specifically hard hats and high-visibility vests — from construction site camera feeds.
+A production-deployed object detection microservice for automated workplace safety monitoring. Detects the presence and absence of Personal Protective Equipment (PPE) — specifically hard hats and high-visibility vests — from images of construction sites.
 
-Compliant with EU workplace safety standards (SUVA / EU PPE Directive 2016/425).
+Built around the kinds of PPE covered by EU workplace-safety rules (e.g. Regulation (EU) 2016/425). This is a portfolio project, not a certified safety system.
 
 🔗 **Live Demo:** [https://hunter1a11-realtime-safety-detection.hf.space/docs](https://hunter1a11-realtime-safety-detection.hf.space/docs) — try inference directly in your browser via the interactive Swagger UI.
 
-> **Note on "real-time":** the underlying YOLOv8n model is architecturally suited for real-time inference (single-stage, ~100+ FPS on GPU benchmarks). The current deployment is a single-image HTTP API.
+> **Note on "real-time":** the underlying YOLOv8n model is architecturally suited for real-time inference (single-stage, ~100+ FPS on GPU benchmarks). The current deployment is a single-image HTTP API — see the [Roadmap](#roadmap) for what a continuous video-stream deployment would require.
 
 ---
 
@@ -69,10 +69,11 @@ ppe-detection-api/
 │   └── main.py                  # FastAPI inference endpoint
 ├── models/
 │   └── best.pt                  # Model artifact (download separately — see below)
-├── training/
+├── research/
 │   └── ppe_vision_system.py     # YOLOv8 training pipeline (Roboflow + Ultralytics)
-├── assets/
-│   └── ppe_result.mp4           # Demo video — Swagger UI inference walkthrough
+├── deploy/
+│   └── huggingface/
+│       └── Dockerfile           # Hugging Face Space variant (flat layout, port 7860)
 ├── Dockerfile                   # Production container definition
 ├── requirements.txt             # Pinned Python dependencies
 └── README.md
@@ -210,7 +211,7 @@ All variables can be overridden at runtime via `docker run -e VAR=value` without
 
 ## Docker Notes
 
-**OS dependencies:** `python:3.10-slim` strips many system libraries for size. `libgl1` and `libglib2.0-0` are reinstalled — userspace libraries required by OpenCV's image processing backend, even with the headless build.
+**OS dependencies:** `python:3.10-slim` strips many system libraries for size. `libgl1` and `libglib2.0-0` are reinstalled because `ultralytics` also installs the full `opencv-python` package alongside `opencv-python-headless`, and the full build needs libGL. Removing the duplicate OpenCV install is a known cleanup item.
 
 **Non-root execution:** The container runs as `api_user` — a non-root system account. Principle of least privilege.
 
@@ -218,13 +219,23 @@ All variables can be overridden at runtime via `docker run -e VAR=value` without
 
 ---
 
-## Live Deployment Notes
+## Repository vs Hugging Face Space
 
-This API is deployed live on [Hugging Face Spaces](https://huggingface.co/spaces) (Docker SDK, free tier — 16GB RAM, 2 vCPUs). Unlike typical PaaS free tiers (Render, Railway) which cap RAM at 512MB — insufficient for PyTorch + Ultralytics — Hugging Face Spaces is purpose-built for ML workloads and handles this stack natively.
+The same API runs in two places. The code is the same; the packaging differs, because the Space is a separate Git repository on Hugging Face and its web uploader cannot create folders.
 
-Two deployment-specific adjustments from the standard Docker setup above:
-- **Port:** Hugging Face Spaces expects the container to listen on port `7860`, not `8000`
-- **Single worker:** `--workers 1` in the CMD instruction, since the free tier is a shared environment
+| | GitHub repository | Hugging Face Space |
+|---|---|---|
+| Layout | `app/main.py`, `models/`, `training/` | flat: `main.py`, `best.pt`, `Dockerfile`, `requirements.txt`, `README.md` at the root |
+| Model weights | not committed (`*.pt` is git-ignored) — download link in Quick Start | `best.pt` (under 10 MB) committed to the Space |
+| Dockerfile | `Dockerfile` — copies `app/` and `models/`, runs `app.main:app` | `deploy/huggingface/Dockerfile` — copies `main.py` and `best.pt`, runs `main:app` |
+| Port | 8000 | 7860 (Spaces default) |
+| Workers | 4 | 1 (shared free-tier CPU) |
+| `MODEL_PATH` | `models/best.pt` | `best.pt`, set by `ENV` in the Dockerfile |
+| README | plain Markdown | starts with the YAML block Spaces reads (`sdk: docker`); GitHub shows it as a small table |
+
+`main.py` and `requirements.txt` are identical in both. The one environment-specific setting, `MODEL_PATH`, is set by the Dockerfile `ENV` line rather than by editing code. Precedence: `docker run -e` > Dockerfile `ENV` > the default in `os.getenv`.
+
+**Why Hugging Face Spaces:** the first deployment attempt, on Render's free tier (512 MB RAM), failed with an out-of-memory error — PyTorch plus Ultralytics need more than that. The Spaces free CPU tier has 16 GB RAM and ran the same container without changes beyond the port, layout and worker count above.
 
 ---
 

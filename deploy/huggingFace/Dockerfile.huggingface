@@ -1,20 +1,18 @@
 # ==============================================================
-# PPE Detection API — Production Dockerfile
+# PPE Detection API — Hugging Face Spaces Dockerfile
 # ==============================================================
-# YOLOv8 FastAPI microservice for PPE detection (single-image HTTP inference).
-# Optimized for CPU inference on lightweight Debian base.
+# Same application as the main Dockerfile, packaged for a Space:
+#   - flat layout: main.py and best.pt sit at the Space root
+#     (the Spaces web uploader cannot create sub-folders)
+#   - listens on port 7860 (the Spaces default)
+#   - 1 worker (shared free-tier CPU)
+#   - MODEL_PATH is set here, not by editing main.py
 #
-# Build:
-#   docker build -t ppe-detection-api:v1 .
+# Space root must contain:
+#   Dockerfile (this file) · main.py · best.pt · requirements.txt · README.md
 #
-# Run:
-#   docker run -p 8000:8000 ppe-detection-api:v1
-#
-# Run with overrides:
-#   docker run -p 8000:8000 \
-#     -e CONF_THRESHOLD=0.35 \
-#     -e MODEL_PATH=models/best.pt \
-#     ppe-detection-api:v1
+# NOTE: reconstructed from the main Dockerfile plus the changes made
+# while deploying. Compare it with the file actually running in the Space.
 # ==============================================================
 
 # ── Base Image
@@ -36,7 +34,7 @@ ENV PYTHONUNBUFFERED=1
 # ── Application Configuration
 # These are system defaults — override at runtime via docker run -e
 # ENV hierarchy: docker run -e (highest) > Dockerfile ENV > os.getenv fallback (lowest)
-ENV MODEL_PATH=models/best.pt
+ENV MODEL_PATH=best.pt
 ENV CONF_THRESHOLD=0.40
 ENV IOU_THRESHOLD=0.50
 
@@ -78,8 +76,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # ── Application Code
 # --chown sets file ownership in a single COPY layer.
 # Avoids a separate RUN chown command which would add an extra layer.
-COPY --chown=api_user app/ app/
-COPY --chown=api_user models/ models/
+COPY --chown=api_user main.py .
+COPY --chown=api_user best.pt .
 
 # ── Drop Privileges
 # Switch to non-root user for all subsequent operations including CMD.
@@ -87,9 +85,8 @@ COPY --chown=api_user models/ models/
 USER api_user
 
 # ── Port Declaration
-# Documents that the container listens on port 8000.
-# Does not actually publish the port — use -p 8000:8000 at docker run.
-EXPOSE 8000
+# Documents that the container listens on port 7860 (Hugging Face Spaces default).
+EXPOSE 7860
 
 # ── Health Monitoring
 # Docker automatically monitors container health using this instruction.
@@ -99,13 +96,9 @@ EXPOSE 8000
 # --retries=3        : mark unhealthy after 3 consecutive failures
 # Connects directly to the /health liveness endpoint in main.py
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:7860/health || exit 1
 
 # ── Entrypoint
-# --host 0.0.0.0 : bind to all interfaces — required for Docker port mapping
-#                  (127.0.0.1 would be unreachable from outside the container)
-# --workers 4    : 4 independent processes for parallel request handling
-#                  Rule of thumb: (2 × CPU_cores) + 1
-#                  Note: each worker loads its own model instance into memory
-#                  Calculate: model_size_MB × workers ≤ available RAM
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# --workers 1 : each worker loads its own model copy; one is enough for a
+#               shared free-tier CPU and keeps memory use low.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
