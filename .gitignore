@@ -21,7 +21,7 @@ env/
 # ── Model Artifacts & Weights
 # Weights are large binary files — tracked via external storage (Google Drive)
 # Cloners: download best.pt and place in models/ — see README.md
-models/*
+#models/*
 !models/.gitkeep      # preserves the models/ directory structure in the repo
 !models/best.pt
 *.pt
