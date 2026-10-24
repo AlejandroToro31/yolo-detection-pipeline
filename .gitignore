@@ -27,7 +27,6 @@ models/*
 *.pt
 *.pth
 *.engine
-*.onnx
 
 # ── YOLO Training Output (can be GBs of checkpoints and visualizations)
 runs/

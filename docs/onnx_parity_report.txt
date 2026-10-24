@@ -1,0 +1,34 @@
+========================================================================
+PT vs ONNX COMPARISON REPORT
+========================================================================
+Images compared : 12
+Settings        : conf=0.4 iou=0.5 imgsz=640 warmup=3 repeats=5
+Tolerances      : conf diff <= 0.02, box diff <= 2.0 px (match IoU >= 0.5)
+
+PARITY
+  OK         : 12
+  BORDERLINE : 0   (small numeric differences, or a detection right at the cutoff)
+  MISMATCH   : 0   (clear disagreement — look at these images)
+  Total detections: pt=85  onnx=85
+  Largest confidence difference on matched boxes: 0.0
+  Largest box difference on matched boxes      : 0.0 px
+
+LATENCY (wall-clock around predict(): preprocess + inference + NMS, CPU)
+  .pt   : median   147.6 ms | mean   160.0 | p90   192.9
+  .onnx : median   126.3 ms | mean   135.9 | p90   167.5
+  onnx/pt median ratio: 0.86  (below 1.00 means ONNX is faster)
+  ONNX faster on 12 of 12 images
+  Do not quote a speedup unless it holds across images AND across repeated runs of this script.
+
+ENVIRONMENT
+  python        : 3.13.16
+  platform      : Linux-6.6.122+-x86_64-with-glibc2.39
+  cpu_count     : 2
+  ultralytics   : 8.4.176
+  torch         : 2.11.0+cpu
+  onnxruntime   : 1.31.0
+  onnx          : 1.23.2
+  cv2           : 5.0.0
+  numpy         : 2.1.3
+  pt_size_mb    : 6.26
+  onnx_size_mb  : 12.4

@@ -68,9 +68,13 @@ ppe-detection-api/
 ├── app/
 │   └── main.py                  # FastAPI inference endpoint
 ├── models/
-│   └── best.pt                  # Model artifact (download separately — see below)
+│   ├── best.pt                  # PyTorch weights (download separately — see below)
+│   └── best.onnx                # ONNX export (dynamic shapes), verified against best.pt
+├── docs/
+│   └── onnx_parity_report.txt   # output of the final parity run
 ├── research/
-│   └── ppe_vision_system.py     # YOLOv8 training pipeline (Roboflow + Ultralytics)
+│   ├── ppe_vision_system.py     # YOLOv8 training pipeline (Roboflow + Ultralytics)
+│   └── compare_pt_onnx.py       # .pt vs ONNX parity + latency test
 ├── deploy/
 │   └── huggingface/
 │       └── Dockerfile           # Hugging Face Space variant (flat layout, port 7860)
@@ -239,6 +243,35 @@ The same API runs in two places. The code is the same; the packaging differs, be
 
 ---
 
+## ONNX Export & Verification
+
+The model was exported to ONNX and checked against the PyTorch weights before anything was claimed about it.
+
+**Export** (Ultralytics, Google Colab):
+
+```bash
+yolo export model=best.pt format=onnx imgsz=640 dynamic=True
+```
+
+**Parity test:** `scripts/compare_pt_onnx.py` runs the same photos through `best.pt` and `best.onnx` (conf 0.40, IoU 0.50, imgsz 640) and compares the detections: class, box position (matched at IoU ≥ 0.50), confidence and box coordinates (tolerances: 0.02 confidence, 2 px). Full output: [`docs/onnx_parity_report.txt`](docs/onnx_parity_report.txt).
+
+| | `best.pt` | `best.onnx` |
+|---|---|---|
+| Detections on 12 test photos | 85 | 85 |
+| Largest confidence / box difference on matched boxes | — | 0.0 / 0.0 px |
+| Median latency, CPU (2 vCPU Colab) | 147.6 ms | 126.3 ms (ratio 0.86) |
+| File size | 6.3 MB | 12.4 MB |
+
+**What this does and does not show**
+- The 12 photos are my own test images (not included in the repo). This is a parity check, not a benchmark or an accuracy evaluation.
+- Latency is wall-clock time around `predict()` (preprocessing + inference + NMS) on a shared 2-vCPU Colab machine. Repeated runs gave a median ratio of about 0.85–0.86. CPU only; no GPU, TensorRT or INT8 results.
+- The ONNX file is larger because `.pt` stores half-precision weights and the ONNX export stores full precision.
+- **The deployed API still serves `best.pt`.** ONNX is exported and verified, not deployed.
+
+**Why `dynamic=True`:** a first export with fixed input shape differed from `.pt` on 4 of 12 photos (detections that sat just above the 0.40 confidence cutoff appeared in one model but not the other, and a few boxes moved by up to ~24 px). The weights were not the problem: re-exporting with `dynamic=True` made the output identical. This is consistent with a difference in input padding (fixed 640×640 vs minimal padding), and it is why the comparison was worth running.
+
+---
+
 ## Roadmap
 
 **Current state:** single-image HTTP inference API. The trained model and inference logic transfer completely unchanged to a video pipeline — this is deliberately the hard part, and it's already done.
@@ -246,10 +279,13 @@ The same API runs in two places. The code is the same; the packaging differs, be
 **What a continuous real-time video deployment would add:**
 - **Frame ingestion loop** — `cv2.VideoCapture` or an RTSP stream, replacing request/response with continuous polling
 - **Object tracking** (ByteTrack) — maintains identity across frames, robust to brief occlusion
-- **ONNX → TensorRT → INT8 export** — strips Python runtime overhead, hardware-tuned kernels, ~4× smaller model with minimal accuracy loss — the standard path for edge deployment on hardware like NVIDIA Jetson
+- **ONNX export** — done and verified against the PyTorch model (see above), not yet used by the API
+- **TensorRT → INT8** — next step after ONNX: hardware-tuned kernels and a smaller model, the standard path for edge deployment on hardware like NVIDIA Jetson. Not started; any speed or size gain would need to be measured on target hardware
 
 ---
 
 ## Changelog
+
+**v1.1.0 — ONNX export (verified, not deployed).** Added `models/best.onnx` (dynamic shapes), `scripts/compare_pt_onnx.py` and the final parity report. On 12 test photos both models returned the same 85 detections with 0.0 confidence and box differences; median CPU latency was about 14% lower for ONNX on a 2-vCPU Colab machine. A first export without `dynamic=True` differed on borderline detections. The API still runs `best.pt`.
 
 **v1.0.1 — colour-channel fix.** The API used to convert decoded images from BGR to RGB before calling `model.predict()`. Ultralytics treats numpy input as BGR, so the model was receiving swapped channels. It showed up as a visibly wrong result: on the test photo above, a worker wearing a vest was flagged `no-vest`. After removing the conversion, the same photo gives 6 correct detections: the false `no-vest` is gone, the left-hand worker's helmet and vest (previously missed) are detected, and confidences rose on the others (e.g. the right-hand worker's vest from 0.71 to 0.84). Single-image comparison, not a benchmark.
